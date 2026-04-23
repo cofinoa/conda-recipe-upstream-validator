@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.7"
 license = {text = "GPL-3.0-or-later"}
 authors = [
-    {name = "Antonio S. Cofiño", email = "antonio.cofino@unican.es", 
+    {name = "Antonio S. Cofiño", email = "cofinoa@gmail.com", 
      comment = "ORCID: 0000-0001-7719-979X, GitHub: @cofinoa"}
 ]
 keywords = ["conda", "recipe", "validation", "dependencies", "upstream"]
