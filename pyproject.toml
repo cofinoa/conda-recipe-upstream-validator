@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "conda-recipe-upstream-validator"
+version = "0.1.0"
+description = "Validate conda recipe dependencies against upstream package metadata (DESCRIPTION, setup.py, etc.)"
+readme = "README.md"
+requires-python = ">=3.7"
+license = {text = "GPL-3.0-or-later"}
+authors = [
+    {name = "Antonio S. Cofiño", email = "antonio.cofino@unican.es", 
+     comment = "ORCID: 0000-0001-7719-979X, GitHub: @cofinoa"}
+]
+keywords = ["conda", "recipe", "validation", "dependencies", "upstream"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.urls]
+Homepage = "https://github.com/cofinoa/conda-recipe-upstream-validator"
+Documentation = "https://github.com/cofinoa/conda-recipe-upstream-validator#readme"
+Repository = "https://github.com/cofinoa/conda-recipe-upstream-validator.git"
+Issues = "https://github.com/cofinoa/conda-recipe-upstream-validator/issues"
+
+[project.scripts]
+conda-recipe-upstream-validator = "upstream_recipe_validator.cli:main"
+
+[tool.setuptools]
+packages = ["upstream_recipe_validator"]
