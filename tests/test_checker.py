@@ -11,6 +11,7 @@ from upstream_recipe_validator.checker import (
     parse_description_deps,
     parse_meta_yaml_deps,
 )
+from upstream_recipe_validator.r_packages import load_mapping_config
 
 
 def test_normalize_r_package_name():
@@ -186,3 +187,96 @@ Imports:
 
         Path(desc.name).unlink()
         Path(meta.name).unlink()
+
+
+def test_check_dependencies_excluded_package_not_required():
+        """Excluded packages in mapping policy should not be required in meta.yaml."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as desc:
+                desc.write("""Package: sample
+Imports:
+        utils,
+        abind
+""")
+                desc.flush()
+
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as meta:
+                        meta.write("""requirements:
+    host:
+        - r-abind
+    run:
+        - r-abind
+""")
+                        meta.flush()
+
+                        errors, warnings = check_dependencies(desc.name, meta.name)
+
+                assert len(errors) == 0
+                assert len(warnings) == 0
+
+                Path(desc.name).unlink()
+                Path(meta.name).unlink()
+
+
+def test_check_dependencies_override_yaml_mapping_and_exclusion():
+        """Override YAML should update mappings and add exclusions."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as desc:
+                desc.write("""Package: sample
+Imports:
+        RCurl,
+        pkgToIgnore
+""")
+                desc.flush()
+
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as meta:
+                        meta.write("""requirements:
+    host:
+        - custom-rcurl
+    run:
+        - custom-rcurl
+""")
+                        meta.flush()
+
+                        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as override:
+                                override.write("""conda_name_map:
+    RCurl: custom-rcurl
+exclude_from_recipe:
+    - pkgToIgnore
+""")
+                                override.flush()
+
+                                errors, warnings = check_dependencies(
+                                        desc.name,
+                                        meta.name,
+                                        mapping_override_yaml=override.name,
+                                )
+
+                        Path(override.name).unlink()
+
+                assert len(errors) == 0
+                assert len(warnings) == 0
+
+                Path(desc.name).unlink()
+                Path(meta.name).unlink()
+
+
+def test_load_mapping_config_override_shadows_without_replacing():
+        """Override should shadow selected keys and keep remaining generic mappings."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as override:
+                override.write("""conda_name_map:
+    NewPkg: custom-newpkg
+exclude_from_recipe:
+    - anotherIgnoredPkg
+""")
+                override.flush()
+
+                config = load_mapping_config(override_yaml_path=override.name)
+
+        # New mapping from override is added
+        assert config.conda_name_map["NewPkg"] == "custom-newpkg"
+        # Existing generic mappings from base YAML are preserved
+        assert "DBI" in config.conda_name_map
+        # Override exclusions are merged with base exclusions
+        assert "anotherIgnoredPkg" in config.excluded_from_recipe
+        assert "utils" in config.excluded_from_recipe
+
+        Path(override.name).unlink()

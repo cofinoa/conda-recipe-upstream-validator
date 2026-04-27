@@ -1,0 +1,87 @@
+# R package mapping policy for conda-recipe-upstream-validator
+#
+# default_mapping: generic rule for package names not listed in conda_name_map
+# exclude_from_recipe: packages intentionally ignored by dependency checks
+# conda_name_map: explicit exceptions for package naming
+
+default_mapping:
+  prefix: r-
+  lowercase: true
+
+# Packages that are part of R base and should not require separate conda deps.
+exclude_from_recipe:
+  - base
+  - compiler
+  - datasets
+  - graphics
+  - grDevices
+  - grid
+  - methods
+  - parallel
+  - splines
+  - stats
+  - stats4
+  - tcltk
+  - tools
+  - utils
+
+# Optional metadata kept for future rules and reporting.
+base_packages:
+  - base
+  - compiler
+  - datasets
+  - graphics
+  - grDevices
+  - grid
+  - methods
+  - parallel
+  - splines
+  - stats
+  - stats4
+  - tcltk
+  - tools
+  - utils
+
+recommended_packages:
+  - boot
+  - class
+  - cluster
+  - codetools
+  - foreign
+  - KernSmooth
+  - lattice
+  - MASS
+  - Matrix
+  - mgcv
+  - nlme
+  - nnet
+  - rpart
+  - spatial
+  - survival
+
+# Explicit name exceptions. Keys are package names as they appear in DESCRIPTION.
+conda_name_map:
+  # Bioconductor
+  BiocGenerics: bioconductor-biocgenerics
+  BiocParallel: bioconductor-biocparallel
+  Biobase: bioconductor-biobase
+  GenomicRanges: bioconductor-genomicranges
+  IRanges: bioconductor-iranges
+  S4Vectors: bioconductor-s4vectors
+  SummarizedExperiment: bioconductor-summarizedexperiment
+  AnnotationDbi: bioconductor-annotationdbi
+  limma: bioconductor-limma
+  edgeR: bioconductor-edger
+  DESeq2: bioconductor-deseq2
+  # CRAN packages with non-standard conda-forge naming
+  DBI: r-dbi
+  RSQLite: r-rsqlite
+  RMySQL: r-rmysql
+  RPostgreSQL: r-rpostgresql
+  RCurl: r-rcurl
+  XML: r-xml
+  RJSONIO: r-rjsonio
+  jsonlite: r-jsonlite
+  RNetCDF: r-rnetcdf
+  ncdf4: r-ncdf4
+  rJava: r-rjava

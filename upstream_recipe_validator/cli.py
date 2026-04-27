@@ -9,6 +9,27 @@ from pathlib import Path
 from upstream_recipe_validator.checker import check_dependencies
 
 
+RECIPE_OVERRIDE_FILENAME = "upstream_recipe_validator.yaml"
+
+
+def _resolve_mapping_override_yaml(meta_path: Path, explicit_override: str | None) -> str | None:
+    """
+    Resolve override YAML path.
+
+    Priority:
+      1) Explicit --mapping-override-yaml argument
+      2) Recipe-local special file next to meta.yaml
+    """
+    if explicit_override:
+        return explicit_override
+
+    candidate = meta_path.parent / RECIPE_OVERRIDE_FILENAME
+    if candidate.exists():
+        return str(candidate)
+
+    return None
+
+
 def main():
     """Run as script, expecting paths from command line or defaults."""
     parser = argparse.ArgumentParser(
@@ -17,6 +38,7 @@ def main():
         epilog="""
 Examples:
   %(prog)s --description DESCRIPTION --meta-yaml recipe/meta.yaml
+    %(prog)s --mapping-override-yaml custom_r_map.yaml
   %(prog)s --strict --exit-code 2
         """,
     )
@@ -29,6 +51,14 @@ Examples:
         "--meta-yaml",
         default="recipe/meta.yaml",
         help="Path to conda recipe meta.yaml (default: recipe/meta.yaml)",
+    )
+    parser.add_argument(
+        "--mapping-override-yaml",
+        default=None,
+        help=(
+            "Optional YAML with mapping/exclusion overrides merged on top of "
+            "the built-in package mapping (partial override, not full replacement)"
+        ),
     )
     parser.add_argument(
         "--strict",
@@ -60,8 +90,15 @@ Examples:
         print(f"ERROR: {meta_path} not found", file=sys.stderr)
         sys.exit(2)
 
+    mapping_override_yaml = _resolve_mapping_override_yaml(
+        meta_path, args.mapping_override_yaml
+    )
+
     errors, warnings = check_dependencies(
-        str(desc_path), str(meta_path), strict=args.strict
+        str(desc_path),
+        str(meta_path),
+        strict=args.strict,
+        mapping_override_yaml=mapping_override_yaml,
     )
 
     # Print results

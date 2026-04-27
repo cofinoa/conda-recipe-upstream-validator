@@ -6,6 +6,8 @@ import re
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
 
+from .r_packages import MappingConfig, load_mapping_config
+
 
 def parse_description_deps(description_path: str) -> Dict[str, Set[str]]:
     """
@@ -33,8 +35,8 @@ def parse_description_deps(description_path: str) -> Dict[str, Set[str]]:
             dep_str = dep_str.strip()
             if not dep_str:
                 continue
-            # Remove version constraints: "rJava" -> "rJava", "package(>= 1.0)" -> "package"
-            dep_name = re.sub(r"\s*[\(\)>=<\d.\s]+.*", "", dep_str).strip()
+            # Remove version constraints while preserving dots in package names.
+            dep_name = re.split(r"\s*\(", dep_str, maxsplit=1)[0].strip()
             if dep_name and dep_name != "R":  # Ignore R itself
                 result[key].add(dep_name)
 
@@ -67,31 +69,44 @@ def parse_meta_yaml_deps(meta_yaml_path: str) -> Set[str]:
                 line = line.strip()
                 if line.startswith("- "):
                     pkg = line[2:].strip()
-                    # Remove version constraints
-                    pkg = re.sub(r"\s*[\(\)>=<\d.\s#]+.*", "", pkg).strip()
+                    # Remove comments and version constraints while preserving dots.
+                    pkg = pkg.split("#", maxsplit=1)[0].strip()
+                    pkg = re.split(r"\s+", pkg, maxsplit=1)[0].strip()
                     if pkg and not pkg.startswith("{"):  # Skip templated vars
                         deps.add(pkg)
 
     return deps
 
 
-def normalize_r_package_name(r_name: str) -> str:
+def normalize_r_package_name(r_name: str, config: MappingConfig | None = None) -> str:
     """
     Convert R package name to conda format (e.g., rJava -> r-rjava).
 
+    Uses explicit mappings first; falls back to the configured generic rule.
+
     Args:
         r_name: R package name
+        config: Optional mapping configuration. If not provided, default YAML
+            configuration is loaded.
 
     Returns:
         Normalized conda package name
     """
-    return f"r-{r_name.lower()}"
+    if config is None:
+        config = load_mapping_config()
+
+    if r_name in config.conda_name_map:
+        return config.conda_name_map[r_name]
+
+    normalized_name = r_name.lower() if config.default_lowercase else r_name
+    return f"{config.default_prefix}{normalized_name}"
 
 
 def check_dependencies(
     description_path: str = "DESCRIPTION",
     meta_yaml_path: str = "recipe/meta.yaml",
     strict: bool = False,
+    mapping_override_yaml: str | None = None,
 ) -> Tuple[List[str], List[str]]:
     """
     Compare R package dependencies with conda recipe.
@@ -100,6 +115,8 @@ def check_dependencies(
         description_path: Path to DESCRIPTION file
         meta_yaml_path: Path to meta.yaml file
         strict: If True, Suggests are also checked (ERROR if missing)
+        mapping_override_yaml: Optional YAML path with mapping/exclusion
+            overrides to merge on top of package defaults.
 
     Returns:
         tuple (errors_list, warnings_list)
@@ -110,17 +127,28 @@ def check_dependencies(
     # Parse both files
     r_deps = parse_description_deps(description_path)
     conda_deps = parse_meta_yaml_deps(meta_yaml_path)
+    mapping_config = load_mapping_config(override_yaml_path=mapping_override_yaml)
 
     # Normalize R package names to conda format
-    r_depends_conda = {normalize_r_package_name(pkg) for pkg in r_deps["depends"]}
-    r_imports_conda = {normalize_r_package_name(pkg) for pkg in r_deps["imports"]}
+    r_depends_conda = {
+        normalize_r_package_name(pkg, mapping_config)
+        for pkg in r_deps["depends"]
+        if pkg not in mapping_config.excluded_from_recipe
+    }
+    r_imports_conda = {
+        normalize_r_package_name(pkg, mapping_config)
+        for pkg in r_deps["imports"]
+        if pkg not in mapping_config.excluded_from_recipe
+    }
 
-    # Known R base packages that don't need to be listed in conda
-    r_base_packages = {"utils", "stats", "graphics", "methods", "base"}
+    # Excluded packages are considered satisfied by policy and do not require
+    # explicit conda recipe entries.
 
     # Check Depends (should be in conda host/run)
     for pkg in r_deps["depends"]:
-        pkg_conda = normalize_r_package_name(pkg)
+        if pkg in mapping_config.excluded_from_recipe:
+            continue
+        pkg_conda = normalize_r_package_name(pkg, mapping_config)
         if pkg_conda not in conda_deps:
             errors.append(
                 f"DESCRIPTION Depends '{pkg}' not found in meta.yaml (expected '{pkg_conda}')"
@@ -128,9 +156,9 @@ def check_dependencies(
 
     # Check Imports (should be in conda host/run)
     for pkg in r_deps["imports"]:
-        if pkg in r_base_packages:
-            continue  # Skip R base packages
-        pkg_conda = normalize_r_package_name(pkg)
+        if pkg in mapping_config.excluded_from_recipe:
+            continue
+        pkg_conda = normalize_r_package_name(pkg, mapping_config)
         if pkg_conda not in conda_deps:
             errors.append(
                 f"DESCRIPTION Imports '{pkg}' not found in meta.yaml (expected '{pkg_conda}')"
@@ -139,7 +167,9 @@ def check_dependencies(
     # Check Suggests if strict mode
     if strict:
         for pkg in r_deps["suggests"]:
-            pkg_conda = normalize_r_package_name(pkg)
+            if pkg in mapping_config.excluded_from_recipe:
+                continue
+            pkg_conda = normalize_r_package_name(pkg, mapping_config)
             if pkg_conda not in conda_deps:
                 warnings.append(
                     f"DESCRIPTION Suggests '{pkg}' not found in meta.yaml (expected '{pkg_conda}')"
