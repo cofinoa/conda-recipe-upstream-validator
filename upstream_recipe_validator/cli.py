@@ -94,6 +94,13 @@ Examples:
         meta_path, args.mapping_override_yaml
     )
 
+    if mapping_override_yaml:
+        print(
+            f"⚠️  NOTE: Recipe-specific mapping override in use ({mapping_override_yaml}). "
+            "Validation may be incomplete or skipping packages that differ from the generic policy.",
+            file=sys.stderr,
+        )
+
     errors, warnings = check_dependencies(
         str(desc_path),
         str(meta_path),
