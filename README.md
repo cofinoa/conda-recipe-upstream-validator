@@ -241,6 +241,26 @@ and are not considered authors or copyright holders of this software.
 
 See [AI_USAGE.md](AI_USAGE.md) for a more detailed disclosure.
 
+## Scholarly contribution
+
+This software should be understood as a scholarly research output. Its
+contribution is not limited to the source code itself, but includes the design
+decisions, validation procedures, documentation, interoperability with existing
+scientific tools, and its role in supporting reproducible scientific workflows.
+
+Research software of this kind is increasingly recognised as a primary research
+artefact in the computational sciences. Its scholarly impact is appropriately
+evaluated using software-specific evidence: persistent identifiers for archived
+releases, citations to specific versions, adoption and reuse in scientific
+workflows, integration with community infrastructure (such as conda-forge),
+quality of documentation, and long-term maintenance commitment.
+
+The [CITATION.cff](CITATION.cff) file provides structured citation metadata
+following the Citation File Format standard, which is supported by major
+software archives and citation tools. Archived releases with persistent
+identifiers will be made available through Zenodo or an equivalent repository
+as the software matures.
+
 ## License
 
 This software is distributed under the BSD 3-Clause License. See [LICENSE](LICENSE) for details.
