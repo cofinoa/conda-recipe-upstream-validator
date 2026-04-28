@@ -7,6 +7,7 @@ from pathlib import Path
 
 from upstream_recipe_validator.checker import (
     PackageDep,
+    RecipeDeps,
     VersionConstraint,
     _parse_constraints,
     _version_warnings,
@@ -95,20 +96,22 @@ requirements:
 
         result = parse_meta_yaml_deps(f.name)
 
-    assert "r-base" in result
-    assert "r-rcurl" in result
-    assert "r-abind" in result
-    assert "r-loader.java" in result
-    assert "r-rjava" in result
+    assert "r-base" in result.host
+    assert "r-rcurl" in result.host
+    assert "r-abind" in result.host
 
-    assert result["r-rjava"].has_constraints
-    assert result["r-rjava"].constraints[0].operator == ">="
-    assert result["r-rjava"].constraints[0].normalized_version == "0.9.8"
+    # r-loader.java and r-rjava are only in run in this fixture
+    assert "r-loader.java" in result.run
+    assert "r-rjava" in result.run
 
-    assert result["r-rcurl"].has_constraints
-    assert result["r-rcurl"].constraints[0].version == "1.95"
+    assert result.run["r-rjava"].has_constraints
+    assert result.run["r-rjava"].constraints[0].operator == ">="
+    assert result.run["r-rjava"].constraints[0].normalized_version == "0.9.8"
 
-    assert not result["r-abind"].has_constraints
+    assert result.host["r-rcurl"].has_constraints
+    assert result.host["r-rcurl"].constraints[0].version == "1.95"
+
+    assert not result.host["r-abind"].has_constraints
 
     Path(f.name).unlink()
 
@@ -441,6 +444,58 @@ Imports:
         assert len(warnings) == 1
         assert "0.9-8" in warnings[0]
         assert "0.5" in warnings[0]
+
+        Path(desc.name).unlink()
+        Path(meta.name).unlink()
+
+
+def test_check_dependencies_host_only_warns():
+    """Package present in host but absent from run should produce a warning."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as desc:
+        desc.write("""Package: sample
+Imports:
+    abind
+""")
+        desc.flush()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as meta:
+            meta.write("""requirements:
+  host:
+    - r-abind
+  run: []
+""")
+            meta.flush()
+
+            errors, warnings = check_dependencies(desc.name, meta.name)
+
+        assert len(errors) == 0
+        assert any("host" in w and "run" in w for w in warnings)
+
+        Path(desc.name).unlink()
+        Path(meta.name).unlink()
+
+
+def test_check_dependencies_run_only_warns():
+    """Package present in run but absent from host should produce a warning."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as desc:
+        desc.write("""Package: sample
+Imports:
+    abind
+""")
+        desc.flush()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as meta:
+            meta.write("""requirements:
+  host: []
+  run:
+    - r-abind
+""")
+            meta.flush()
+
+            errors, warnings = check_dependencies(desc.name, meta.name)
+
+        assert len(errors) == 0
+        assert any("run" in w and "host" in w for w in warnings)
 
         Path(desc.name).unlink()
         Path(meta.name).unlink()

@@ -125,47 +125,65 @@ def parse_description_deps(description_path: str) -> Dict[str, Dict[str, Package
     return result
 
 
-def parse_meta_yaml_deps(meta_yaml_path: str) -> Dict[str, PackageDep]:
+@dataclass
+class RecipeDeps:
+    """Dependencies parsed from a conda meta.yaml, split by section."""
+
+    host: Dict[str, PackageDep] = field(default_factory=dict)
+    run: Dict[str, PackageDep] = field(default_factory=dict)
+
+    def in_host(self, name: str) -> bool:
+        return name in self.host
+
+    def in_run(self, name: str) -> bool:
+        return name in self.run
+
+    def in_both(self, name: str) -> bool:
+        return name in self.host and name in self.run
+
+    def get(self, name: str) -> Optional[PackageDep]:
+        """Return the dep entry preferring run (where version pins usually live)."""
+        return self.run.get(name) or self.host.get(name)
+
+
+def _parse_section(content: str, section: str) -> Dict[str, PackageDep]:
+    deps: Dict[str, PackageDep] = {}
+    pattern = rf"^\s*{section}:\s*\n((?:^\s+- .+$\n?)*)"
+    for match in re.finditer(pattern, content, re.MULTILINE):
+        for line in match.group(1).splitlines():
+            line = line.strip()
+            if not line.startswith("- "):
+                continue
+            entry = line[2:].split("#", maxsplit=1)[0].strip()
+            if not entry or entry.startswith("{"):
+                continue
+            tokens = re.split(r"\s+", entry, maxsplit=1)
+            pkg_name = tokens[0].strip()
+            if not pkg_name:
+                continue
+            constraints: List[VersionConstraint] = []
+            if len(tokens) > 1:
+                constraints = _parse_constraints(tokens[1])
+            if pkg_name not in deps or (constraints and not deps[pkg_name].has_constraints):
+                deps[pkg_name] = PackageDep(name=pkg_name, constraints=constraints)
+    return deps
+
+
+def parse_meta_yaml_deps(meta_yaml_path: str) -> RecipeDeps:
     """
-    Parse a conda ``meta.yaml`` and extract host + run dependencies.
+    Parse a conda ``meta.yaml`` and extract host and run dependencies separately.
 
     Returns:
+        A :class:`RecipeDeps` with ``.host`` and ``.run`` dicts
         ``{conda_package_name: PackageDep}`` (version constraints included).
     """
-    deps: Dict[str, PackageDep] = {}
-
+    # TODO: add LinkingTo support — packages in DESCRIPTION LinkingTo should be
+    # required in host only (compile-time headers), not in run.
     content = Path(meta_yaml_path).read_text(encoding="utf-8")
-
-    for section in ["host", "run"]:
-        pattern = rf"^\s*{section}:\s*\n((?:^\s+- .+$\n?)*)"
-        for match in re.finditer(pattern, content, re.MULTILINE):
-            for line in match.group(1).splitlines():
-                line = line.strip()
-                if not line.startswith("- "):
-                    continue
-
-                entry = line[2:].split("#", maxsplit=1)[0].strip()
-                if not entry or entry.startswith("{"):
-                    continue
-
-                # Split name from inline version constraints (space-separated).
-                # e.g. "r-rjava >=0.9_8" or "r-rjava >=0.9_8,<2.0"
-                tokens = re.split(r"\s+", entry, maxsplit=1)
-                pkg_name = tokens[0].strip()
-                if not pkg_name:
-                    continue
-
-                constraints: List[VersionConstraint] = []
-                if len(tokens) > 1:
-                    constraints = _parse_constraints(tokens[1])
-
-                # Merge constraints: package may appear in both host and run.
-                if pkg_name not in deps:
-                    deps[pkg_name] = PackageDep(name=pkg_name, constraints=constraints)
-                elif constraints and not deps[pkg_name].has_constraints:
-                    deps[pkg_name] = PackageDep(name=pkg_name, constraints=constraints)
-
-    return deps
+    return RecipeDeps(
+        host=_parse_section(content, "host"),
+        run=_parse_section(content, "run"),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -262,7 +280,7 @@ def check_dependencies(
     warnings: List[str] = []
 
     r_deps = parse_description_deps(description_path)
-    conda_deps = parse_meta_yaml_deps(meta_yaml_path)
+    recipe = parse_meta_yaml_deps(meta_yaml_path)
     mapping_config = load_mapping_config(override_yaml_path=mapping_override_yaml)
 
     def _check_field(
@@ -276,7 +294,10 @@ def check_dependencies(
 
             pkg_conda = normalize_r_package_name(r_pkg, mapping_config)
 
-            if pkg_conda not in conda_deps:
+            in_host = recipe.in_host(pkg_conda)
+            in_run = recipe.in_run(pkg_conda)
+
+            if not in_host and not in_run:
                 msg = (
                     f"DESCRIPTION {field_label} '{r_pkg}' not found in meta.yaml "
                     f"(expected '{pkg_conda}')"
@@ -287,10 +308,21 @@ def check_dependencies(
                     warnings.append(msg)
                 continue
 
+            if in_host and not in_run:
+                warnings.append(
+                    f"'{pkg_conda}' is in meta.yaml host but missing from run "
+                    f"(DESCRIPTION {field_label} '{r_pkg}')"
+                )
+            elif in_run and not in_host:
+                warnings.append(
+                    f"'{pkg_conda}' is in meta.yaml run but missing from host "
+                    f"(DESCRIPTION {field_label} '{r_pkg}')"
+                )
+
             # Package is present — check version constraints.
-            warnings.extend(
-                _version_warnings(r_pkg, upstream_dep, conda_deps[pkg_conda])
-            )
+            conda_dep = recipe.get(pkg_conda)
+            if conda_dep is not None:
+                warnings.extend(_version_warnings(r_pkg, upstream_dep, conda_dep))
 
     _check_field(r_deps["depends"], "Depends", missing_is_error=True)
     _check_field(r_deps["imports"], "Imports", missing_is_error=True)
@@ -304,7 +336,8 @@ def check_dependencies(
         for p in r_deps[field]
         if p not in mapping_config.excluded_from_recipe
     }
-    for pkg in conda_deps:
+    all_recipe_r_pkgs = set(recipe.host) | set(recipe.run)
+    for pkg in all_recipe_r_pkgs:
         if not pkg.startswith("r-"):
             continue
         if pkg not in all_r_names_conda and pkg != "r-base":
