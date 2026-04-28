@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this software in academic work, please cite it using the metadata below."
+title: "conda-recipe-upstream-validator"
+authors:
+  - family-names: "Cofiño"
+    given-names: "Antonio S."
+    email: cofinoa@gmail.com
+    orcid: "https://orcid.org/0000-0001-7719-979X"
+version: "0.1.0"
+date-released: "2026-04-23"
+license: "BSD-3-Clause"
+url: "https://github.com/cofinoa/conda-recipe-upstream-validator"
+preferred-citation:
+  type: software
+  title: "conda-recipe-upstream-validator: Validate conda recipe dependencies against upstream package metadata"
+  authors:
+    - family-names: "Cofiño"
+      given-names: "Antonio S."
+      orcid: "https://orcid.org/0000-0001-7719-979X"
+  year: 2026
+  url: "https://github.com/cofinoa/conda-recipe-upstream-validator"

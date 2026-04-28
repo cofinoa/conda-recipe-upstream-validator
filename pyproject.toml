@@ -8,18 +8,18 @@ version = "0.1.0"
 description = "Validate conda recipe dependencies against upstream package metadata (DESCRIPTION, setup.py, etc.)"
 readme = "README.md"
 requires-python = ">=3.7"
-license = {text = "GPL-3.0-or-later"}
+license = {text = "BSD-3-Clause"}
 dependencies = [
     "pyyaml",
 ]
 authors = [
-    { name = "Antonio S. Cofiño", email = "cofinoa@gmail.com" }
+    { name = "Antonio S. Cofiño (@cofinoa)", email = "cofinoa@gmail.com" }
 ]
 keywords = ["conda", "recipe", "validation", "dependencies", "upstream"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "License :: OSI Approved :: BSD License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
