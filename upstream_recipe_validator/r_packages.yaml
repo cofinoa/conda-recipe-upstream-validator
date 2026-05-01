@@ -85,3 +85,4 @@ conda_name_map:
   RNetCDF: r-rnetcdf
   ncdf4: r-ncdf4
   rJava: r-rjava
+  calibratoR: r-c4r-calibrator
