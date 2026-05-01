@@ -2,10 +2,7 @@
 
 Validate conda recipe dependencies against upstream package metadata.
 
-This project is authored and maintained by Antonio S. Cofiño.
-
-**Author**: Antonio S. Cofiño
-([ORCID](https://orcid.org/0000-0001-7719-979X),
+**Author:** Antonio S. Cofiño ([ORCID](https://orcid.org/0000-0001-7719-979X),
 [@cofinoa](https://github.com/cofinoa))
 
 ## Summary
