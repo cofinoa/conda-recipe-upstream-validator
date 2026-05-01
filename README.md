@@ -2,6 +2,12 @@
 
 Validate conda recipe dependencies against upstream package metadata.
 
+This project is authored and maintained by Antonio S. Cofiño.
+
+**Author**: Antonio S. Cofiño
+([ORCID](https://orcid.org/0000-0001-7719-979X),
+[@cofinoa](https://github.com/cofinoa))
+
 ## Summary
 
 `conda-recipe-upstream-validator` is a Python command-line tool and library that
@@ -51,6 +57,8 @@ non-zero exit code unless `--strict` is used.
 
 ## Installation
 
+Current release installation:
+
 ```bash
 pip install conda-recipe-upstream-validator
 ```
@@ -62,6 +70,14 @@ git clone https://github.com/cofinoa/conda-recipe-upstream-validator.git
 cd conda-recipe-upstream-validator
 pip install -e .
 ```
+
+Conda installation (once a conda-forge recipe/release is available):
+
+```bash
+conda install -c conda-forge conda-recipe-upstream-validator
+```
+
+Until then, use the pip-based installation above.
 
 ## Usage
 
@@ -212,35 +228,6 @@ pytest -v
 Tests cover name normalisation, constraint parsing, version comparison,
 dependency matching, mapping overrides, and host/run section symmetry checks.
 
-## Citation
-
-If you use this software in academic work, please cite it using the information
-provided in [CITATION.cff](CITATION.cff).
-
-Preferred citation:
-
-> Antonio S. Cofiño (2026). *conda-recipe-upstream-validator: Validate conda
-> recipe dependencies against upstream package metadata*. Version 0.1.0.
-> https://github.com/cofinoa/conda-recipe-upstream-validator
-
-## Authorship and AI-assisted development
-
-This project is authored and maintained by Antonio S. Cofiño.
-
-Some parts of the source code and documentation may have been drafted with the
-assistance of large language model based tools. These tools were used as
-development assistants under human direction, supervision, review, and
-validation.
-
-The ideas, requirements, software design, scientific context, integration
-decisions, and final acceptance of the code remain the responsibility of the
-human author and maintainer.
-
-AI-generated suggestions are not treated as independent authorship contributions
-and are not considered authors or copyright holders of this software.
-
-See [AI_USAGE.md](AI_USAGE.md) for a more detailed disclosure.
-
 ## Scholarly contribution
 
 This software should be understood as a scholarly research output. Its
@@ -260,6 +247,33 @@ following the Citation File Format standard, which is supported by major
 software archives and citation tools. Archived releases with persistent
 identifiers will be made available through Zenodo or an equivalent repository
 as the software matures.
+
+## Citation
+
+If you use this software in academic work, please cite it using the information
+provided in [CITATION.cff](CITATION.cff).
+
+Preferred citation:
+
+> Antonio S. Cofiño (2026). *conda-recipe-upstream-validator: Validate conda
+> recipe dependencies against upstream package metadata*. Version 0.1.0.
+> https://github.com/cofinoa/conda-recipe-upstream-validator
+
+## AI-assisted development
+
+This project is authored and maintained by its author.
+
+Some parts of the source code and documentation may have been drafted with the
+assistance of large language model based tools. These tools were used as
+development assistants under human direction, supervision, review, and
+validation.
+
+The ideas, requirements, software design, scientific context, integration
+decisions, and final acceptance of the code remain the responsibility of the
+author and maintainer.
+
+AI-generated suggestions are not treated as independent authorship contributions
+and are not considered authors or copyright holders of this software.
 
 ## License
 
