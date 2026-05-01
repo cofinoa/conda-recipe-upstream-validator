@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "conda-recipe-upstream-validator"
-version = "0.1.0"
-description = "Validate conda recipe dependencies against upstream package metadata (DESCRIPTION, setup.py, etc.)"
+version = "0.1.1"
+description = "Validate conda recipe dependencies against upstream R DESCRIPTION metadata"
 readme = "README.md"
 requires-python = ">=3.7"
 license = {text = "BSD-3-Clause"}

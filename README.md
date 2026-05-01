@@ -14,6 +14,9 @@ intended for use by conda-forge recipe maintainers and package authors who want
 to catch missing, extra, or mismatched dependencies when updating conda recipes
 to new upstream versions.
 
+At present, only upstream R `DESCRIPTION` metadata is supported. Formats such
+as Python `setup.py` are not yet implemented.
+
 ## Statement of need
 
 Conda recipes for R packages (and other language ecosystems) must manually mirror
@@ -253,7 +256,7 @@ provided in [CITATION.cff](CITATION.cff).
 Preferred citation:
 
 > Antonio S. Cofiño (2026). *conda-recipe-upstream-validator: Validate conda
-> recipe dependencies against upstream package metadata*. Version 0.1.0.
+> recipe dependencies against upstream package metadata*. Version 0.1.1.
 > https://github.com/cofinoa/conda-recipe-upstream-validator
 
 ## AI-assisted development

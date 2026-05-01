@@ -1,0 +1,27 @@
+{
+  "title": "conda-recipe-upstream-validator",
+  "description": "Validate conda recipe dependencies against upstream R DESCRIPTION metadata.",
+  "upload_type": "software",
+  "license": "BSD-3-Clause",
+  "access_right": "open",
+  "creators": [
+    {
+      "name": "Cofi\u00f1o, Antonio S.",
+      "orcid": "https://orcid.org/0000-0001-7719-979X"
+    }
+  ],
+  "keywords": [
+    "conda",
+    "recipes",
+    "dependency-validation",
+    "research-software",
+    "R"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/cofinoa/conda-recipe-upstream-validator",
+      "relation": "isSupplementTo",
+      "resource_type": "software"
+    }
+  ]
+}

@@ -6,8 +6,8 @@ authors:
     given-names: "Antonio S."
     email: cofinoa@gmail.com
     orcid: "https://orcid.org/0000-0001-7719-979X"
-version: "0.1.0"
-date-released: "2026-04-23"
+version: "0.1.1"
+date-released: "2026-05-01"
 license: "BSD-3-Clause"
 url: "https://github.com/cofinoa/conda-recipe-upstream-validator"
 preferred-citation:
