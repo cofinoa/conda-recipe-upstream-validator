@@ -10,7 +10,7 @@ The configuration supports:
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, FrozenSet, Optional
 
 import yaml
 
@@ -21,7 +21,7 @@ class MappingConfig:
 
   default_prefix: str
   default_lowercase: bool
-  excluded_from_recipe: frozenset[str]
+  excluded_from_recipe: FrozenSet[str]
   conda_name_map: Dict[str, str]
 
 
@@ -87,7 +87,7 @@ def _resolve_config(data: Dict[str, Any]) -> MappingConfig:
   )
 
 
-def load_mapping_config(override_yaml_path: str | None = None) -> MappingConfig:
+def load_mapping_config(override_yaml_path: Optional[str] = None) -> MappingConfig:
   """
   Load mapping configuration from package default YAML plus optional override.
 

@@ -5,6 +5,7 @@ Command-line interface for conda-recipe-upstream-validator.
 import argparse
 import sys
 from pathlib import Path
+from typing import Optional
 
 from upstream_recipe_validator.checker import check_dependencies
 
@@ -12,7 +13,9 @@ from upstream_recipe_validator.checker import check_dependencies
 RECIPE_OVERRIDE_FILENAME = "upstream_recipe_validator.yaml"
 
 
-def _resolve_mapping_override_yaml(meta_path: Path, explicit_override: str | None) -> str | None:
+def _resolve_mapping_override_yaml(
+    meta_path: Path, explicit_override: Optional[str]
+) -> Optional[str]:
     """
     Resolve override YAML path.
 

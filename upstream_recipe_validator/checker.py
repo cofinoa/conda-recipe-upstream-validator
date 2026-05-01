@@ -190,7 +190,7 @@ def parse_meta_yaml_deps(meta_yaml_path: str) -> RecipeDeps:
 # Name normalization
 # ---------------------------------------------------------------------------
 
-def normalize_r_package_name(r_name: str, config: MappingConfig | None = None) -> str:
+def normalize_r_package_name(r_name: str, config: Optional[MappingConfig] = None) -> str:
     """
     Convert an R package name to its conda-forge equivalent.
 
@@ -261,7 +261,7 @@ def check_dependencies(
     description_path: str = "DESCRIPTION",
     meta_yaml_path: str = "recipe/meta.yaml",
     strict: bool = False,
-    mapping_override_yaml: str | None = None,
+    mapping_override_yaml: Optional[str] = None,
 ) -> Tuple[List[str], List[str]]:
     """
     Compare R package dependencies with conda recipe.

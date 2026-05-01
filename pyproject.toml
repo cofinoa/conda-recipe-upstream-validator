@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools>=61", "wheel", "tomli; python_version < '3.11'"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -12,6 +12,7 @@ license = {text = "BSD-3-Clause"}
 dependencies = [
     "pyyaml",
 ]
+
 authors = [
     { name = "Antonio S. Cofiño (@cofinoa)", email = "cofinoa@gmail.com" }
 ]
@@ -28,6 +29,13 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Topic :: Software Development :: Build Tools",
     "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "build",
+    "twine",
 ]
 
 [project.urls]
