@@ -17,8 +17,10 @@ htmlcov/
 # Virtual environments
 .venv/
 venv/
+.env.local
 
 # Editors
 .idea/
+.vscode/
 *.swp
 *~
