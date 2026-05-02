@@ -253,6 +253,14 @@ as the software matures.
 If you use this software in academic work, please cite it using the information
 provided in [CITATION.cff](CITATION.cff).
 
+## Zenodo Release Workflow
+
+The active Zenodo/InvenioRDM release workflow is documented in
+[zenodo/README.md](zenodo/README.md) and managed with
+`python tools/zenodo_draft.py`.
+
+The legacy shell helper `tools/zenodo_manual_deposit.sh` has been removed.
+
 Preferred citation:
 
 > Antonio S. Cofiño (2026). *conda-recipe-upstream-validator: Validate conda

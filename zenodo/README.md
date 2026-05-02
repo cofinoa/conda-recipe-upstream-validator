@@ -19,6 +19,8 @@ The workflow is managed by:
 python tools/zenodo_draft.py --help
 ```
 
+The legacy helper `tools/zenodo_manual_deposit.sh` is no longer used.
+
 ## Files
 
 ### zenodo/metadata.json
