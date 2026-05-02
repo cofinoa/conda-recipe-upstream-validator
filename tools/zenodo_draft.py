@@ -2,7 +2,7 @@
 """Manual Zenodo / InvenioRDM draft helper.
 
 Uses only the new records API and keeps one mutable draft record tracked in a
-local state file at zenodo/state.json, with local metadata in
+local remote snapshot at zenodo/remote.json, with local metadata in
 zenodo/metadata.json.
 """
 
@@ -261,12 +261,10 @@ def load_state(state_file: pathlib.Path) -> Dict[str, Any]:
 
 
 def get_state_updated_at(state: Dict[str, Any]) -> Optional[str]:
-    val = state.get("state_updated_at")
-    if isinstance(val, str) and val:
-        return val
-    legacy = state.get("updated_at")
-    if isinstance(legacy, str) and legacy:
-        return legacy
+    for key in ("snapshot_updated_at", "state_updated_at", "updated_at"):
+        val = state.get(key)
+        if isinstance(val, str) and val:
+            return val
     return None
 
 
@@ -282,7 +280,7 @@ def save_state(
     state: Dict[str, Any] = {
         "base_url": base_url,
         "record_id": str(record_id),
-        "state_updated_at": utc_now_str(),
+        "snapshot_updated_at": utc_now_str(),
     }
     if doi:
         state["doi"] = doi
@@ -371,6 +369,36 @@ def resolve_doi(remote_response: Optional[Dict[str, Any]], state_doi: Optional[s
     return None
 
 
+def extract_concept_record_id(remote_record_simple: Dict[str, Any]) -> Optional[str]:
+    md = remote_record_simple.get("metadata") if isinstance(remote_record_simple.get("metadata"), dict) else {}
+    relations = md.get("relations") if isinstance(md.get("relations"), dict) else {}
+    version = relations.get("version") if isinstance(relations.get("version"), list) else []
+    if not version:
+        return None
+    first = version[0] if isinstance(version[0], dict) else {}
+    parent = first.get("parent") if isinstance(first.get("parent"), dict) else {}
+    pid_value = parent.get("pid_value")
+    if pid_value is None:
+        return None
+    return str(pid_value)
+
+
+def extract_concept_doi(remote_record: Dict[str, Any], remote_record_simple: Dict[str, Any]) -> Optional[str]:
+    pids = remote_record.get("pids") if isinstance(remote_record.get("pids"), dict) else {}
+    for key in ("concept-doi", "conceptdoi"):
+        node = pids.get(key)
+        if isinstance(node, dict):
+            identifier = node.get("identifier")
+            if isinstance(identifier, str) and identifier:
+                return identifier
+
+    concept_doi = remote_record_simple.get("conceptdoi")
+    if isinstance(concept_doi, str) and concept_doi:
+        return concept_doi
+
+    return None
+
+
 class ZenodoClient:
     def __init__(self, base_url: str, token: str):
         self.base_url = base_url.rstrip("/")
@@ -433,6 +461,13 @@ class ZenodoClient:
             headers={"Accept": accept},
         )
 
+    def get_record(self, record_id: str, accept: str = "application/json") -> Dict[str, Any]:
+        return self._request_json(
+            "GET",
+            f"/api/records/{record_id}",
+            headers={"Accept": accept},
+        )
+
     def create_draft(self, record_id: str) -> Dict[str, Any]:
         return self._request_json("POST", f"/api/records/{record_id}/draft")
 
@@ -444,6 +479,9 @@ class ZenodoClient:
 
     def list_files(self, record_id: str) -> Any:
         return self._request_json("GET", f"/api/records/{record_id}/draft/files")
+
+    def list_record_files(self, record_id: str) -> Any:
+        return self._request_json("GET", f"/api/records/{record_id}/files")
 
     def delete_file(self, record_id: str, filename: str) -> None:
         encoded = urlencode_filename(filename)
@@ -494,36 +532,103 @@ def get_remote_metadata(client: ZenodoClient, record_id: str, accept: str) -> Di
 
 
 def refresh_state_from_remote(client: ZenodoClient, state_file: pathlib.Path, base_url: str, record_id: str) -> Dict[str, Any]:
-    remote = ensure_editable_draft(client, record_id, accept=INVENIORDM_ACCEPT)
-    save_state_from_remote(state_file, base_url, record_id, remote)
-    return load_state(state_file)
+    previous_state = load_state(state_file)
+    previous_doi = previous_state.get("doi") if isinstance(previous_state.get("doi"), str) else None
+
+    used_draft_endpoint = True
+    try:
+        remote_record = client.get_draft(record_id, accept=INVENIORDM_ACCEPT)
+    except ApiError as exc:
+        if exc.status_code != 404:
+            raise
+        used_draft_endpoint = False
+        remote_record = client.get_record(record_id, accept=INVENIORDM_ACCEPT)
+
+    if used_draft_endpoint:
+        remote_record_simple = client.get_draft(record_id, accept="application/json")
+    else:
+        remote_record_simple = client.get_record(record_id, accept="application/json")
+
+    files: List[Any] = []
+    try:
+        files_resp = client.list_files(record_id) if used_draft_endpoint else client.list_record_files(record_id)
+        if isinstance(files_resp, dict) and isinstance(files_resp.get("entries"), list):
+            files = files_resp.get("entries", [])
+        elif isinstance(files_resp, list):
+            files = files_resp
+    except ApiError:
+        files = []
+
+    summary_record_id = str(remote_record.get("id") or record_id)
+    concept_record_id = extract_concept_record_id(remote_record_simple)
+    doi = resolve_doi(remote_record, previous_doi)
+    concept_doi = extract_concept_doi(remote_record, remote_record_simple)
+    remote_created = remote_record.get("created") if isinstance(remote_record.get("created"), str) else None
+    remote_updated = remote_record.get("updated") if isinstance(remote_record.get("updated"), str) else None
+
+    explicit_is_published = remote_record.get("is_published") if isinstance(remote_record.get("is_published"), bool) else None
+    is_published = explicit_is_published if isinstance(explicit_is_published, bool) else (not used_draft_endpoint)
+
+    remote_links = remote_record.get("links") if isinstance(remote_record.get("links"), dict) else {}
+    links = {
+        "html": remote_links.get("self_html") or remote_links.get("latest_html"),
+        "api": remote_links.get("self"),
+        "self": remote_links.get("self"),
+        "files": remote_links.get("files"),
+        "publish": remote_links.get("publish"),
+    }
+
+    snapshot: Dict[str, Any] = {
+        "_comment": "Generated by tools/zenodo_draft.py. Do not edit manually.",
+        "base_url": base_url,
+        "record_id": summary_record_id,
+        "concept_record_id": concept_record_id,
+        "doi": doi,
+        "concept_doi": concept_doi,
+        "is_published": is_published,
+        "remote_created": remote_created,
+        "remote_updated": remote_updated,
+        "snapshot_updated_at": utc_now_str(),
+        "links": links,
+        "remote": {
+            "record": remote_record,
+            "record_simple": remote_record_simple,
+        },
+        "files": files,
+    }
+    state_file.parent.mkdir(parents=True, exist_ok=True)
+    write_json_file(state_file, snapshot)
+    return snapshot
 
 
-def print_status(draft_or_record: Dict[str, Any], state: Optional[Dict[str, Any]] = None) -> None:
-    rid = draft_or_record.get("id", "(unknown)")
-    is_published = bool(draft_or_record.get("is_published", False))
-    state_doi = state.get("doi") if isinstance(state, dict) and isinstance(state.get("doi"), str) else None
-    doi = resolve_doi(draft_or_record, state_doi) or "(not assigned yet)"
-    links = draft_or_record.get("links", {}) if isinstance(draft_or_record, dict) else {}
-    html = links.get("self_html") or links.get("latest_html") or "(n/a)"
-    api = links.get("self") or "(n/a)"
+def print_status(state: Dict[str, Any]) -> None:
+    rid = state.get("record_id", "(unknown)")
+    concept_record_id = state.get("concept_record_id") if isinstance(state.get("concept_record_id"), str) else "(n/a)"
+    is_published = bool(state.get("is_published", False))
+    doi = state.get("doi") if isinstance(state.get("doi"), str) else "(not assigned yet)"
+    concept_doi = state.get("concept_doi") if isinstance(state.get("concept_doi"), str) else "(n/a)"
+    links = state.get("links") if isinstance(state.get("links"), dict) else {}
+    html = links.get("html") or "(n/a)"
+    api = links.get("api") or "(n/a)"
 
     print("--- Zenodo record status ---")
-    print(f"id: {rid}")
-    print(f"is_published: {str(is_published).lower()}")
+    print(f"record_id: {rid}")
+    print(f"concept_record_id: {concept_record_id}")
     print(f"doi: {doi}")
+    print(f"concept_doi: {concept_doi}")
+    print(f"is_published: {str(is_published).lower()}")
     print(f"html: {html}")
     print(f"api: {api}")
     print()
 
 
 def print_state_status(state: Dict[str, Any]) -> None:
-    print("--- Local state (zenodo/state.json) ---")
+    print("--- Local snapshot (zenodo/remote.json) ---")
     print(f"record_id: {state.get('record_id', '(n/a)')}")
     print(f"doi: {state.get('doi', '(not assigned yet)')}")
     print(f"remote_created: {state.get('remote_created', '(n/a)')}")
     print(f"remote_updated: {state.get('remote_updated', '(n/a)')}")
-    print(f"state_updated_at: {get_state_updated_at(state) or '(n/a)'}")
+    print(f"snapshot_updated_at: {get_state_updated_at(state) or '(n/a)'}")
     print(f"base_url: {state.get('base_url', '(n/a)')}")
     print()
 
@@ -594,8 +699,17 @@ def reserve_doi(client: ZenodoClient, record_id: str) -> Dict[str, Any]:
         raise
 
 
-def check_metadata_alignment(client: ZenodoClient, record_id: str, local_metadata: Dict[str, Any]) -> bool:
-    remote_raw = get_remote_metadata(client, record_id, accept=INVENIORDM_ACCEPT)
+def check_metadata_alignment(
+    client: ZenodoClient,
+    state_file: pathlib.Path,
+    base_url: str,
+    record_id: str,
+    local_metadata: Dict[str, Any],
+) -> bool:
+    snapshot = refresh_state_from_remote(client, state_file, base_url, record_id)
+    remote_obj = snapshot.get("remote") if isinstance(snapshot.get("remote"), dict) else {}
+    remote_record = remote_obj.get("record") if isinstance(remote_obj.get("record"), dict) else {}
+    remote_raw = remote_record.get("metadata", {}) if isinstance(remote_record.get("metadata"), dict) else {}
     remote_metadata = normalize_metadata(strip_server_expanded_fields_for_compare(remote_raw))
     local_comp = normalize_metadata(strip_server_expanded_fields_for_compare(local_metadata))
 
@@ -651,10 +765,10 @@ def parse_args() -> argparse.Namespace:
             "    ZENODO_TOKEN=... python tools/zenodo_draft.py --metadata\n\n"
             "  Compare local and remote metadata:\n"
             "    ZENODO_TOKEN=... python tools/zenodo_draft.py --check-metadata\n\n"
-            "  Print remote draft metadata (InvenioRDM representation):\n"
+            "  Print remote.record.metadata (full representation used for alignment):\n"
             "    ZENODO_TOKEN=... python tools/zenodo_draft.py --print-remote-metadata\n\n"
-            "  Print remote draft metadata (Zenodo JSON representation):\n"
-            "    ZENODO_TOKEN=... python tools/zenodo_draft.py --print-remote-metadata-json\n\n"
+            "  Print remote.record_simple.metadata (simplified representation):\n"
+            "    ZENODO_TOKEN=... python tools/zenodo_draft.py --print-remote-metadata-simple\n\n"
             "  Pull UI changes back to local zenodo/metadata.json:\n"
             "    ZENODO_TOKEN=... python tools/zenodo_draft.py --pull-metadata\n\n"
             "  Publish after manual review:\n"
@@ -673,12 +787,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--print-remote-metadata",
         action="store_true",
-        help="Print remote draft metadata using InvenioRDM representation.",
+        help="Print remote.record.metadata, the full metadata representation used for alignment.",
     )
     parser.add_argument(
-        "--print-remote-metadata-json",
+        "--print-remote-metadata-simple",
         action="store_true",
-        help="Print remote draft metadata using Zenodo JSON representation.",
+        help="Print remote.record_simple.metadata, the simplified Zenodo JSON metadata representation.",
     )
     parser.add_argument(
         "--debug-metadata-roundtrip",
@@ -689,9 +803,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--status", action="store_true", help="Show current draft status.")
     parser.add_argument("--publish", action="store_true", help="Publish current draft explicitly.")
 
-    parser.add_argument("--record-id", help="Use this record id and save it to zenodo/state.json.")
-    parser.add_argument("--force", action="store_true", help="Allow --init to overwrite existing zenodo/state.json.")
+    parser.add_argument("--record-id", help="Use this record id (overrides zenodo/remote.json).")
+    parser.add_argument("--force", action="store_true", help="Allow --init to overwrite existing zenodo/remote.json.")
     parser.add_argument("--normalize-metadata", action="store_true", help="Normalize local zenodo/metadata.json in place, with backup.")
+    parser.add_argument("--refresh-remote", action="store_true", help="Fetch the current remote Zenodo draft/record state and rewrite zenodo/remote.json. Read-only: does not modify remote metadata, upload files, or publish.")
 
     parser.add_argument("--sandbox", action="store_true", help="Use https://sandbox.zenodo.org.")
     parser.add_argument("--production", action="store_true", help="Use https://zenodo.org (explicit).")
@@ -699,7 +814,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--base-url", default=default_base, help=argparse.SUPPRESS)
     parser.add_argument("--metadata-file", default=os.getenv("METADATA_FILE", "zenodo/metadata.json"))
     parser.add_argument("--dist-dir", default=os.getenv("DIST_DIR", "dist"))
-    parser.add_argument("--state-file", default=os.getenv("STATE_FILE", "zenodo/state.json"))
+    parser.add_argument("--remote-file", default=os.getenv("REMOTE_FILE", "zenodo/remote.json"))
 
     return parser.parse_args()
 
@@ -720,12 +835,13 @@ def main() -> int:
             args.check_metadata,
             args.print_local_metadata,
             args.print_remote_metadata,
-            args.print_remote_metadata_json,
+            args.print_remote_metadata_simple,
             args.debug_metadata_roundtrip,
             args.pull_metadata,
             args.status,
             args.publish,
             args.normalize_metadata,
+            args.refresh_remote,
         ]
     )
     if not selected:
@@ -750,7 +866,7 @@ def main() -> int:
     repo_root = pathlib.Path.cwd()
     metadata_file = pathlib.Path(args.metadata_file)
     dist_dir = pathlib.Path(args.dist_dir)
-    state_file = pathlib.Path(args.state_file)
+    remote_file = pathlib.Path(args.remote_file)
 
     token_required = any(
         [
@@ -761,11 +877,12 @@ def main() -> int:
             args.reserve_doi,
             args.check_metadata,
             args.print_remote_metadata,
-            args.print_remote_metadata_json,
+            args.print_remote_metadata_simple,
             args.debug_metadata_roundtrip,
             args.pull_metadata,
             args.status,
             args.publish,
+            args.refresh_remote,
         ]
     )
 
@@ -790,8 +907,8 @@ def main() -> int:
         client = ZenodoClient(base_url, token)
 
         if args.init:
-            if state_file.exists() and not args.force:
-                raise ApiError(f"State file already exists: {state_file}. Use --force to overwrite.")
+            if remote_file.exists() and not args.force:
+                raise ApiError(f"Remote file already exists: {remote_file}. Use --force to overwrite.")
 
             local_metadata = load_local_metadata(metadata_file)
             created = client.create_record(
@@ -805,35 +922,24 @@ def main() -> int:
             if not record_id or record_id == "None":
                 raise ApiError("Could not read record id from create response")
 
-            save_state_from_remote(state_file, base_url, record_id, created)
+            save_state_from_remote(remote_file, base_url, record_id, created)
             print(f"Created record id: {record_id}")
 
             update_remote_metadata(client, record_id, local_metadata)
             reserve_doi(client, record_id)
             files = select_files(dist_dir, repo_root)
             upload_files(client, record_id, files)
-            draft = ensure_editable_draft(client, record_id)
-            state = refresh_state_from_remote(client, state_file, base_url, record_id)
+            state = refresh_state_from_remote(client, remote_file, base_url, record_id)
 
             if args.status:
-                print_status(draft, state)
-                print_state_status(state)
+                print_status(state)
             return 0
 
-        state = load_state(state_file)
+        state = load_state(remote_file)
         record_id = args.record_id or state.get("record_id")
         if not record_id:
-            raise ApiError("Record id is required. Use --record-id or create/load zenodo/state.json")
+            raise ApiError("Record id is required. Use --record-id or create zenodo/remote.json via --init or --refresh-remote.")
         record_id = str(record_id)
-        save_state(
-            state_file,
-            base_url,
-            record_id,
-            doi=state.get("doi") if isinstance(state.get("doi"), str) else None,
-            remote_created=state.get("remote_created") if isinstance(state.get("remote_created"), str) else None,
-            remote_updated=state.get("remote_updated") if isinstance(state.get("remote_updated"), str) else None,
-        )
-
         exit_code = 0
 
         if args.sync:
@@ -841,25 +947,25 @@ def main() -> int:
             update_remote_metadata(client, record_id, local_metadata)
             files = select_files(dist_dir, repo_root)
             upload_files(client, record_id, files)
-            state = refresh_state_from_remote(client, state_file, base_url, record_id)
+            state = refresh_state_from_remote(client, remote_file, base_url, record_id)
 
         if args.metadata:
             local_metadata = load_local_metadata(metadata_file)
             update_remote_metadata(client, record_id, local_metadata)
-            state = refresh_state_from_remote(client, state_file, base_url, record_id)
+            state = refresh_state_from_remote(client, remote_file, base_url, record_id)
 
         if args.files:
             files = select_files(dist_dir, repo_root)
             upload_files(client, record_id, files)
-            state = refresh_state_from_remote(client, state_file, base_url, record_id)
+            state = refresh_state_from_remote(client, remote_file, base_url, record_id)
 
         if args.reserve_doi:
             reserve_doi(client, record_id)
-            state = refresh_state_from_remote(client, state_file, base_url, record_id)
+            state = refresh_state_from_remote(client, remote_file, base_url, record_id)
 
         if args.check_metadata:
             local_metadata = load_local_metadata(metadata_file)
-            aligned = check_metadata_alignment(client, record_id, local_metadata)
+            aligned = check_metadata_alignment(client, remote_file, base_url, record_id, local_metadata)
             if not aligned:
                 exit_code = 1
 
@@ -891,27 +997,37 @@ def main() -> int:
             print(json.dumps(local_metadata, indent=2, sort_keys=True, ensure_ascii=False))
 
         if args.print_remote_metadata:
-            remote_metadata = get_remote_metadata(client, record_id, accept=INVENIORDM_ACCEPT)
+            state = refresh_state_from_remote(client, remote_file, base_url, record_id)
+            remote_obj = state.get("remote") if isinstance(state.get("remote"), dict) else {}
+            remote_record = remote_obj.get("record") if isinstance(remote_obj.get("record"), dict) else {}
+            remote_metadata = remote_record.get("metadata", {}) if isinstance(remote_record.get("metadata"), dict) else {}
             print(json.dumps(remote_metadata, indent=2, sort_keys=True, ensure_ascii=False))
 
-        if args.print_remote_metadata_json:
-            remote_metadata_json = get_remote_metadata(client, record_id, accept="application/json")
+        if args.print_remote_metadata_simple:
+            state = refresh_state_from_remote(client, remote_file, base_url, record_id)
+            remote_obj = state.get("remote") if isinstance(state.get("remote"), dict) else {}
+            remote_record_simple = remote_obj.get("record_simple") if isinstance(remote_obj.get("record_simple"), dict) else {}
+            remote_metadata_json = remote_record_simple.get("metadata", {}) if isinstance(remote_record_simple.get("metadata"), dict) else {}
             print(json.dumps(remote_metadata_json, indent=2, sort_keys=True, ensure_ascii=False))
 
         if args.pull_metadata:
             pull_remote_metadata(client, record_id, metadata_file)
 
         if args.publish:
-            published = client.publish(record_id)
-            save_state_from_remote(state_file, base_url, record_id, published)
-            state = load_state(state_file)
+            client.publish(record_id)
+            state = refresh_state_from_remote(client, remote_file, base_url, record_id)
             print("Record published")
 
         if args.status:
-            draft = ensure_editable_draft(client, record_id)
-            state = refresh_state_from_remote(client, state_file, base_url, record_id)
-            print_status(draft, state)
-            print_state_status(state)
+            state = refresh_state_from_remote(client, remote_file, base_url, record_id)
+            print_status(state)
+
+        if args.refresh_remote:
+            state = refresh_state_from_remote(client, remote_file, base_url, record_id)
+            print(f"Remote snapshot saved to {remote_file}")
+            print(f"record_id: {state.get('record_id', '(n/a)')}")
+            print(f"doi: {state.get('doi', '(not assigned yet)')}")
+            print(f"snapshot_updated_at: {get_state_updated_at(state) or '(n/a)'}")
 
         if args.normalize_metadata:
             normalize_local_metadata_in_place(metadata_file)
