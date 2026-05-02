@@ -191,31 +191,31 @@ Recommended derivation:
 - zenodo/metadata.json subjects -> CITATION.cff keywords
 - zenodo/remote.json doi -> CITATION.cff identifiers[type=doi].value
 
-CITATION.cff should normally use the version DOI (not concept DOI).
+CITATION.cff should normally use the version DOI, not concept DOI.
 
 ## Release Branch Workflow
 
 Rule: the release DOI must enter the repository before the Git tag is created.
 
 1. Work on development branch.
-2. Create release branch (example: release/0.1.1).
+2. Create release branch, example: release/0.1.1.
 3. Freeze release metadata in zenodo/metadata.json and related release files.
-4. Create or update Zenodo draft (`--init`, `--metadata`, `--refresh-remote`, `--status`).
-5. Check alignment (`--check-metadata`).
-6. Generate/update CITATION.cff from zenodo/metadata.json + zenodo/remote.json.
+4. Create or update Zenodo draft with `--init`, `--metadata`, `--refresh-remote`, `--status`.
+5. Check alignment with `--check-metadata`.
+6. Generate or update CITATION.cff from zenodo/metadata.json + zenodo/remote.json.
 7. Commit release preparation files.
 8. Merge into main.
 9. Create Git tag only after DOI/citation metadata are committed.
 10. Build release artifacts from the tag.
-11. Upload files (`--files`), refresh, re-check.
-12. Publish (`--publish`), refresh and re-check status.
+11. Upload files with `--files`, refresh, re-check.
+12. Publish with `--publish`, refresh and re-check status.
 13. Create GitHub release including Zenodo version DOI.
 14. Merge main back into development.
 
 ## Normal Commands
 
 ```bash
-# Create draft (first time)
+# Create draft, first time
 python zenodo/manage.py --init
 
 # Push metadata
