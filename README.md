@@ -257,7 +257,7 @@ provided in [CITATION.cff](CITATION.cff).
 
 The active Zenodo/InvenioRDM release workflow is documented in
 [zenodo/README.md](zenodo/README.md) and managed with
-`python tools/zenodo_draft.py`.
+`python zenodo/manage.py`.
 
 The legacy shell helper `tools/zenodo_manual_deposit.sh` has been removed.
 
