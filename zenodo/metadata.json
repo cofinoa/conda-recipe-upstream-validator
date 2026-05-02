@@ -1,0 +1,85 @@
+{
+  "title": "conda-recipe-upstream-validator",
+  "publication_date": "2026-05-01",
+  "version": "0.1.1",
+  "description": "A Python command-line tool and library for validating conda recipe dependencies against upstream package metadata. The tool is intended to support conda-forge recipe maintenance and research software release workflows by comparing dependency declarations in upstream package metadata with those listed in conda recipes.",
+  "publisher": "Zenodo",
+  "resource_type": {
+    "id": "software"
+  },
+  "creators": [
+    {
+      "person_or_org": {
+        "type": "personal",
+        "given_name": "Antonio S.",
+        "family_name": "Cofiño",
+        "identifiers": [
+          {
+            "scheme": "orcid",
+            "identifier": "0000-0001-7719-979X"
+          }
+        ]
+      }
+    }
+  ],
+  "rights": [
+    {
+      "id": "bsd-3-clause"
+    }
+  ],
+  "subjects": [
+    {
+      "subject": "research software"
+    },
+    {
+      "subject": "software citation"
+    },
+    {
+      "subject": "conda"
+    },
+    {
+      "subject": "conda-forge"
+    },
+    {
+      "subject": "recipe maintenance"
+    },
+    {
+      "subject": "dependency validation"
+    },
+    {
+      "subject": "Python"
+    },
+    {
+      "subject": "R"
+    },
+    {
+      "subject": "DESCRIPTION"
+    },
+    {
+      "subject": "meta.yaml"
+    }
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/cofinoa/conda-recipe-upstream-validator",
+      "scheme": "url",
+      "relation_type": {
+        "id": "issupplementto"
+      }
+    },
+    {
+      "identifier": "https://github.com/conda-forge/conda-recipe-upstream-validator-feedstock",
+      "scheme": "url",
+      "relation_type": {
+        "id": "isdocumentedby"
+      }
+    },
+    {
+      "identifier": "https://pypi.org/project/conda-recipe-upstream-validator/",
+      "scheme": "url",
+      "relation_type": {
+        "id": "isidenticalto"
+      }
+    }
+  ]
+}
